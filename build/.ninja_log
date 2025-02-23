@@ -1,7 +1,0 @@
-# ninja log v6
-100	138	7620121577533957	CMakeFiles/copy_dlls	4d48f7bbdae3ee0e
-139	257	7620121577926086	CMakeFiles/kittypulse.dir/src/win32/main.c.obj	4b2127b137dc331a
-100	138	7620121577533957	C:/Users/Administrator/Documents/DEV/cpp/kittypulse/build/CMakeFiles/copy_dlls	4d48f7bbdae3ee0e
-258	350	7620121579116085	kittypulse.exe	be2a0ea8cc4e7274
-102	141	7620123876962857	CMakeFiles/copy_dlls	4d48f7bbdae3ee0e
-102	141	7620123876962857	C:/Users/Administrator/Documents/DEV/cpp/kittypulse/build/CMakeFiles/copy_dlls	4d48f7bbdae3ee0e
