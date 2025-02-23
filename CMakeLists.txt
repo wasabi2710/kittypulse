@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.30)
+cmake_minimum_required(VERSION 3.25)
 project(kittypulse)
 
 if (WIN32) 
@@ -11,11 +11,17 @@ if (WIN32)
 
     add_custom_target(copy_dlls
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${DLLS}
+            ${DLLS} 
             "${CMAKE_BINARY_DIR}"
         COMMENT "Copying dlls to build directory"
     )
 
     add_dependencies(${PROJECT_NAME} copy_dlls)
+
+elseif (LINUX)
+
+    add_executable(${PROJECT_NAME} src/posix/main.c)
+    find_package(SDL3 REQUIRED)
+    target_link_libraries(${PROJECT_NAME} PRIVATE SDL3::SDL3)
 
 endif()
