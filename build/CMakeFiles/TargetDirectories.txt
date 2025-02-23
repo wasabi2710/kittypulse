@@ -1,0 +1,3 @@
+C:/Users/Administrator/Documents/DEV/cpp/kittypulse/build/CMakeFiles/kittypulse.dir
+C:/Users/Administrator/Documents/DEV/cpp/kittypulse/build/CMakeFiles/edit_cache.dir
+C:/Users/Administrator/Documents/DEV/cpp/kittypulse/build/CMakeFiles/rebuild_cache.dir
