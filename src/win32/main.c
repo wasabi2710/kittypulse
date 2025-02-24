@@ -25,25 +25,17 @@ int main() {
         return 1;
     }
 
-    /*render draw color: background*/
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 
     /*event poll*/
     SDL_Event e;
 
-    /*prototypes*/
-    SDL_FRect rect;
-    rect.x = rect.y = rect.h = rect.w = 100;
-
     while(1) {
-        /*keys event*/
         if (SDL_PollEvent(&e)) {
-            /*exit*/
             if (e.type == SDL_EVENT_QUIT) {
                 cleanup();
                 return SDL_APP_SUCCESS;
             }
-            /*key down event*/
             if (e.type == SDL_EVENT_KEY_DOWN) {
                 switch (e.key.scancode) {
                     case SDL_SCANCODE_W:
@@ -55,11 +47,9 @@ int main() {
             }
         }
 
-        /*render here*/
         SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
         SDL_RenderRect(renderer, &rect);
 
-        /*rendering properties*/
         SDL_RenderPresent(renderer);
         SDL_Delay(16); /*60fps*/
     }   
