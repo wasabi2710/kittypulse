@@ -1,69 +1,67 @@
-/* clear.c ... */
-
-/*
- * This example code creates an SDL window and renderer, and then clears the
- * window to a different color every frame, so you'll effectively get a window
- * that's smoothly fading between colors.
- *
- * This code is public domain. Feel free to use it for any purpose!
- */
-
-#define SDL_MAIN_USE_CALLBACKS 1  /* use the callbacks instead of main() */
 #include <SDL3/SDL.h>
-#include <SDL3/SDL_main.h>
+#include <stdio.h>
 
-/* We will use this renderer to draw into this window every frame. */
-static SDL_Window *window = NULL;
-static SDL_Renderer *renderer = NULL;
+/*init window and renderer*/
+SDL_Renderer* renderer;
+SDL_Window* window;
 
-/* This function runs once at startup. */
-SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
-{
-    SDL_SetAppMetadata("Example Renderer Clear", "1.0", "com.example.renderer-clear");
-
-    if (!SDL_Init(SDL_INIT_VIDEO)) {
-        SDL_Log("Couldn't initialize SDL: %s", SDL_GetError());
-        return SDL_APP_FAILURE;
-    }
-
-    if (!SDL_CreateWindowAndRenderer("examples/renderer/clear", 640, 480, 0, &window, &renderer)) {
-        SDL_Log("Couldn't create window/renderer: %s", SDL_GetError());
-        return SDL_APP_FAILURE;
-    }
-
-    return SDL_APP_CONTINUE;  /* carry on with the program! */
+void cleanup() {
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
 }
 
-/* This function runs when a new event (mouse input, keypresses, etc) occurs. */
-SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
-{
-    if (event->type == SDL_EVENT_QUIT) {
-        return SDL_APP_SUCCESS;  /* end the program, reporting success to the OS. */
+int main() {
+    /*Check sdl vid init*/
+    if(!SDL_Init(SDL_INIT_VIDEO)) {
+        // fprintf(stderr, "%s", "Failed: sdl_init_video");
+        printf("Failed Video Initialize\n");
+        return 1;
     }
-    return SDL_APP_CONTINUE;  /* carry on with the program! */
-}
 
-/* This function runs once per frame, and is the heart of the program. */
-SDL_AppResult SDL_AppIterate(void *appstate)
-{
-    const double now = ((double)SDL_GetTicks()) / 1000.0;  /* convert from milliseconds to seconds. */
-    /* choose the color for the frame we will draw. The sine wave trick makes it fade between colors smoothly. */
-    const float red = (float) (0.5 + 0.5 * SDL_sin(now));
-    const float green = (float) (0.5 + 0.5 * SDL_sin(now + SDL_PI_D * 2 / 3));
-    const float blue = (float) (0.5 + 0.5 * SDL_sin(now + SDL_PI_D * 4 / 3));
-    SDL_SetRenderDrawColorFloat(renderer, red, green, blue, SDL_ALPHA_OPAQUE_FLOAT);  /* new color, full alpha. */
+    if (!SDL_CreateWindowAndRenderer("KittyPulse", 400, 400, SDL_WINDOW_RESIZABLE, &window, &renderer)) {
+        printf("SDL Window Creation failed\n");
+        SDL_Quit();
+        return 1;
+    }
 
-    /* clear the window to the draw color. */
-    SDL_RenderClear(renderer);
+    /*render draw color: background*/
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 
-    /* put the newly-cleared rendering on the screen. */
-    SDL_RenderPresent(renderer);
+    /*event poll*/
+    SDL_Event e;
 
-    return SDL_APP_CONTINUE;  /* carry on with the program! */
-}
+    /*prototypes*/
+    SDL_FRect rect;
+    rect.x = rect.y = rect.h = rect.w = 100;
 
-/* This function runs once at shutdown. */
-void SDL_AppQuit(void *appstate, SDL_AppResult result)
-{
-    /* SDL will clean up the window/renderer for us. */
+    while(1) {
+        /*keys event*/
+        if (SDL_PollEvent(&e)) {
+            /*exit*/
+            if (e.type == SDL_EVENT_QUIT) {
+                cleanup();
+                return SDL_APP_SUCCESS;
+            }
+            /*key down event*/
+            if (e.type == SDL_EVENT_KEY_DOWN) {
+                switch (e.key.scancode) {
+                    case SDL_SCANCODE_W:
+                        rect.x += 1;
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+
+        /*render here*/
+        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+        SDL_RenderRect(renderer, &rect);
+
+        /*rendering properties*/
+        SDL_RenderPresent(renderer);
+        SDL_Delay(16); /*60fps*/
+    }   
+
 }
