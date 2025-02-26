@@ -1,69 +1,70 @@
-/* clear.c ... */
+#include <X11/Xlib.h>
+#include <X11/extensions/shape.h>
+#include <X11/extensions/Xfixes.h>
+#include <X11/Xutil.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
-/*
- * This example code creates an SDL window and renderer, and then clears the
- * window to a different color every frame, so you'll effectively get a window
- * that's smoothly fading between colors.
- *
- * This code is public domain. Feel free to use it for any purpose!
- */
-
-#define SDL_MAIN_USE_CALLBACKS 1  /* use the callbacks instead of main() */
-#include <SDL3/SDL.h>
-#include <SDL3/SDL_main.h>
-
-/* We will use this renderer to draw into this window every frame. */
-static SDL_Window *window = NULL;
-static SDL_Renderer *renderer = NULL;
-
-/* This function runs once at startup. */
-SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
-{
-    SDL_SetAppMetadata("Example Renderer Clear", "1.0", "com.example.renderer-clear");
-
-    if (!SDL_Init(SDL_INIT_VIDEO)) {
-        SDL_Log("Couldn't initialize SDL: %s", SDL_GetError());
-        return SDL_APP_FAILURE;
+// Create a circular region
+XserverRegion create_circle_region(Display *dpy, int x, int y, int radius) {
+    XserverRegion region = XFixesCreateRegion(dpy, NULL, 0);
+    for (int dy = -radius; dy <= radius; dy++) {
+        for (int dx = -radius; dx <= radius; dx++) {
+            if (dx * dx + dy * dy <= radius * radius) {
+                XRectangle rect = { x + dx, y + dy, 1, 1 };
+                XFixesUnionRegion(dpy, region, region, XFixesCreateRegion(dpy, &rect, 1));
+            }
+        }
     }
-
-    if (!SDL_CreateWindowAndRenderer("examples/renderer/clear", 640, 480, 0, &window, &renderer)) {
-        SDL_Log("Couldn't create window/renderer: %s", SDL_GetError());
-        return SDL_APP_FAILURE;
-    }
-
-    return SDL_APP_CONTINUE;  /* carry on with the program! */
+    return region;
 }
 
-/* This function runs when a new event (mouse input, keypresses, etc) occurs. */
-SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
-{
-    if (event->type == SDL_EVENT_QUIT) {
-        return SDL_APP_SUCCESS;  /* end the program, reporting success to the OS. */
+int main() {
+    Display *dpy = XOpenDisplay(NULL);
+    if (!dpy) {
+        fprintf(stderr, "Failed to open X display\n");
+        return 1;
     }
-    return SDL_APP_CONTINUE;  /* carry on with the program! */
-}
 
-/* This function runs once per frame, and is the heart of the program. */
-SDL_AppResult SDL_AppIterate(void *appstate)
-{
-    const double now = ((double)SDL_GetTicks()) / 1000.0;  /* convert from milliseconds to seconds. */
-    /* choose the color for the frame we will draw. The sine wave trick makes it fade between colors smoothly. */
-    const float red = (float) (0.5 + 0.5 * SDL_sin(now));
-    const float green = (float) (0.5 + 0.5 * SDL_sin(now + SDL_PI_D * 2 / 3));
-    const float blue = (float) (0.5 + 0.5 * SDL_sin(now + SDL_PI_D * 4 / 3));
-    SDL_SetRenderDrawColorFloat(renderer, red, green, blue, SDL_ALPHA_OPAQUE_FLOAT);  /* new color, full alpha. */
+    int screen = DefaultScreen(dpy);
+    Window root = RootWindow(dpy, screen);
 
-    /* clear the window to the draw color. */
-    SDL_RenderClear(renderer);
+    // Create a Bigger Window (800x600)
+    XSetWindowAttributes attrs;
+    attrs.override_redirect = True;
+    attrs.background_pixel = 0; // Transparent background
 
-    /* put the newly-cleared rendering on the screen. */
-    SDL_RenderPresent(renderer);
+    int win_width = 800, win_height = 600;
+    Window win = XCreateWindow(dpy, root, 100, 100, win_width, win_height, 0,
+        CopyFromParent, InputOutput, CopyFromParent,
+        CWOverrideRedirect | CWBackPixel, &attrs);
 
-    return SDL_APP_CONTINUE;  /* carry on with the program! */
-}
+    // Make Entire Window Click-Through
+    XserverRegion region = XFixesCreateRegion(dpy, NULL, 0);
+    XFixesSetWindowShapeRegion(dpy, win, ShapeInput, 0, 0, region);
+    XFixesDestroyRegion(dpy, region);
 
-/* This function runs once at shutdown. */
-void SDL_AppQuit(void *appstate, SDL_AppResult result)
-{
-    /* SDL will clean up the window/renderer for us. */
+    // Make a Clickable Circle in the Center
+    int circle_radius = 100;
+    XserverRegion clickable = create_circle_region(dpy, win_width / 2, win_height / 2, circle_radius);
+    XFixesSetWindowShapeRegion(dpy, win, ShapeInput, 0, 0, clickable);
+    XFixesDestroyRegion(dpy, clickable);
+
+    // Draw the Circle (Red)
+    GC gc = XCreateGC(dpy, win, 0, NULL);
+    XSetForeground(dpy, gc, 0xff0000); // Red color
+    XFillArc(dpy, win, gc, (win_width / 2) - circle_radius, (win_height / 2) - circle_radius, 
+             circle_radius * 2, circle_radius * 2, 0, 360 * 64);
+
+    XMapWindow(dpy, win);
+
+    // Keep Running
+    XEvent ev;
+    while (1) {
+        XNextEvent(dpy, &ev);
+    }
+
+    XCloseDisplay(dpy);
+    return 0;
 }
