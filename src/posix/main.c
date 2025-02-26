@@ -58,6 +58,7 @@ int main() {
              circle_radius * 2, circle_radius * 2, 0, 360 * 64);
 
     XMapWindow(dpy, win);
+    //baljh
 
     // Keep Running
     XEvent ev;
