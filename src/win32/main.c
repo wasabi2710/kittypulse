@@ -1,88 +1,81 @@
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_hints.h>
+#include <SDL3/SDL_oldnames.h>
+#include <SDL3/SDL_render.h>
+#include <SDL3/SDL_surface.h>
+#include <SDL3_image/SDL_image.h>
 #include <windows.h>
 #include <stdio.h>
+
+#define PROJECT_NAME "KittyPulse"
 
 SDL_Window* window;
 SDL_Renderer* renderer;
 
-void SetClickableRegion(HWND hwnd, int centerX, int centerY, int width, int height) {
-    int left = centerX - (width / 2);
-    int top = centerY - (height / 2);
-    int right = centerX + (width / 2);
-    int bottom = centerY + (height / 2);
+typedef struct {
+    int width;
+    int height;
+} ScreenSize;
 
-    HRGN hRgnClickable = CreateRectRgn(left, top, right, bottom);
-    SetWindowRgn(hwnd, hRgnClickable, TRUE);
-    DeleteObject(hRgnClickable);
+// helpers will be modulized soon
+
+void logging(const char* msg) { /*need to find away to pass const char -> non const char*/
+    fprintf(stderr, "%s", msg);
+}
+
+ScreenSize getPrimaryRes() { // get primary display res
+    ScreenSize size;
+    size.width = GetSystemMetrics(SM_CXSCREEN);
+    size.height = GetSystemMetrics(SM_CYSCREEN);
+    return size;
+}
+
+void cleanup() {
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
 }
 
 int main() {
+    FILE* file = fopen("log.txt", "w");
+
     if (!SDL_Init(SDL_INIT_VIDEO)) {
-        printf("Failed Init SDL Video\n");
+        logging(SDL_GetError());
+        return 1;
+    }
+    if(!SDL_CreateWindowAndRenderer(PROJECT_NAME, getPrimaryRes().width, getPrimaryRes().height, SDL_WINDOW_TRANSPARENT | SDL_WINDOW_ALWAYS_ON_TOP, &window, &renderer)) {
+        logging(SDL_GetError());
         return 1;
     }
 
-    if (!SDL_CreateWindowAndRenderer("KittyPulse", 500, 500, SDL_WINDOW_ALWAYS_ON_TOP, &window, &renderer)) {
-        printf("Failed Window & Renderer Creation\n");
-        return 1;
-    }
-
-    // set layered
-    HWND hwnd = GetActiveWindow();
-    SetWindowLong(hwnd, GWL_EXSTYLE, GetWindowLong(hwnd, GWL_EXSTYLE) | WS_EX_TRANSPARENT);
+    // set native layering and transparent
+    HWND hwnd = GetActiveWindow(); // this window
+    SetWindowLong(hwnd, GWL_EXSTYLE, GetWindowLong(hwnd, GWL_EXSTYLE) | WS_EX_LAYERED);
     SetLayeredWindowAttributes(hwnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
 
-    // Set the clickable region
-    SetClickableRegion(hwnd, 250, 250, 50, 50); // Center of the window, 50x50 clickable area.
+    SDL_Texture* sprite = IMG_LoadTexture(renderer, "src/images/Cat Sprite Sheet_1.png");
+    if (sprite) {
+        SDL_SetTextureScaleMode(sprite, SDL_SCALEMODE_NEAREST); //or SDL_SCALEMODE_BEST
+    }
+    SDL_FRect dstRect = {500, 500, 128, 128};  // Screen position & size
 
     SDL_Event e;
-    POINT cursorPos;
-    SDL_Point clientCursorPos;
-
-    while (1) {
+    while(1) {
         if (SDL_PollEvent(&e) != 0) {
             if (e.type == SDL_EVENT_QUIT) {
-                printf("Exit program ...\n");
-                return 0;
-            }
-            if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
-                // Check if the click was within the clickable region (the filled rectangle)
-                if (e.button.x >= 225 && e.button.x <= 275 && e.button.y >= 225 && e.button.y <= 275) {
-                    printf("Hello\n");
-                }
+                cleanup();
+                return EXIT_SUCCESS;
             }
         }
 
-        // Get mouse position using Windows API
-        if (GetCursorPos(&cursorPos)) {
-            if (ScreenToClient(hwnd, &cursorPos)) {
-                clientCursorPos.x = cursorPos.x;
-                clientCursorPos.y = cursorPos.y;
-            }
-        }
-
-        // Clear the window with a specific color (e.g., black)
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
 
-        // Draw the larger rectangle with a different color (e.g., green)
-        SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-        SDL_FRect rect;
-        rect.x = 50;
-        rect.y = 50;
-        rect.w = 100;
-        rect.h = 100;
-        SDL_RenderRect(renderer, &rect);
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 
-        // Draw the smaller filled rectangle in the center
-        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red color
-        SDL_FRect fillRect;
-        fillRect.x = 225; // Center X - width/2
-        fillRect.y = 225; // Center Y - height/2
-        fillRect.w = 50;
-        fillRect.h = 50;
-        SDL_RenderFillRect(renderer, &fillRect);
+        /*render*/
+        SDL_RenderTexture(renderer, sprite, NULL, &dstRect);
 
         SDL_RenderPresent(renderer);
     }
+    
 }

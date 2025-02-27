@@ -5,7 +5,9 @@ if (WIN32)
 
     add_executable(${PROJECT_NAME} src/win32/main.c)
     find_package(SDL3 REQUIRED)
-    target_link_libraries(${PROJECT_NAME} PRIVATE SDL3::SDL3)
+    find_package(SDL3_image REQUIRED)
+    set_target_properties(SDL3_image::SDL3_image-shared PROPERTIES IMPORTED_IMPLIB "C:\\Program Files (x86)\\SDL3_image\\lib\\libSDL3_image.dll.a")
+    target_link_libraries(${PROJECT_NAME} PRIVATE SDL3_image::SDL3_image SDL3::SDL3)
 
     file(GLOB DLLS "${CMAKE_SOURCE_DIR}/dlls/*.dll")
 
