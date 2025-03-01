@@ -38,7 +38,7 @@ void cleanup() {
 
 /*---------------------- renderer --------------------------*/
 int main() {
-    FILE* file = fopen("log.txt", "w");
+    //FILE* file = fopen("log.txt", "w");
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         logging(SDL_GetError());
@@ -78,7 +78,7 @@ int main() {
     while(1) {
         if (SDL_PollEvent(&e) != 0) {
             if (e.type == SDL_EVENT_QUIT) {
-                fclose(file);
+                //fclose(file);
                 SDL_DestroyTexture(sprite);
                 cleanup();
                 return EXIT_SUCCESS;
@@ -104,9 +104,7 @@ int main() {
         Uint32 currentTicks = SDL_GetTicks();
         if ((currentTicks - lastFrameTime) >= frameDuration) {
             currentFrame++;
-            if (currentFrame >= totalFrames) {
-                currentFrame = 0;
-            }
+            if (currentFrame >= totalFrames) currentFrame = 0;
             lastFrameTime = currentTicks;    
         }
 
