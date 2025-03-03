@@ -47,20 +47,29 @@ State stateMachine(char* state) {
 }
 
 void updateMovement(char* animationName, State* state, SDL_FRect* dstRect) {
+    // Define speed and direction as static variables to retain their values between function calls
+    static float speed = 10.0f;
+    static int direction = 1; 
     
-    /* mod main state */
+    // Modify main state
     *state = stateMachine(animationName);
+    int boundX = getPrimaryRes().width - 128;
 
-    /* mod main movement */
     if (strcmp(animationName, "IDLE") == 0) {
         dstRect->x = 0.f;
-    } else if (strcmp(animationName, "WALK") == 0) {
-        dstRect->x += 1.f;
     } else if (strcmp(animationName, "RUN") == 0) {
-        dstRect->x += 3.f;
+        dstRect->x += speed * direction;
+        
+        if (dstRect->x <= 0) {
+            direction = 1;
+        } else if (dstRect->x >= boundX) {
+            direction = -1;  
+        }
     }
 
+    
 }
+
 
 /*---------------------- helpers --------------------------*/
 void logging(const char* msg) {
@@ -118,17 +127,22 @@ int main() {
                 if (e.button.x >= dstRect.x && e.button.x <= (dstRect.x + dstRect.w) &&
                     e.button.y >= dstRect.y && e.button.y <= (dstRect.y + dstRect.h)) {
                     
-                    // prototype: changing state based on movement
-                    if (swap == 1) {
-                        strcpy(animationName, "WALK");
-                        swap = 2; // Switch to RUN next time
-                    } else {
-                        strcpy(animationName, "RUN");
-                        swap = 1; // Switch back to WALK next time
-                    }
+                    // // prototype: changing state based on movement
+                    // if (swap == 1) {
+                    //     strcpy(animationName, "WALK");
+                    //     swap = 2; // Switch to RUN next time
+                    // } else {
+                    //     strcpy(animationName, "RUN");
+                    //     swap = 1; // Switch back to WALK next time
+                    // }
+                    strcpy(animationName, "RUN");
                 }
             }
         }
+
+        // logger
+        // printf("m->x: %f\n", dstRect.x);
+        //printf("m->y: %f\n", dstRect.y);
 
         // update movement and state
         updateMovement(animationName, &state, &dstRect);
