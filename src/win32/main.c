@@ -79,7 +79,19 @@ void updateMovement(char* animationName, SDL_FlipMode* flipMode, State* state, S
     static int direction = 1;
     *state = stateMachine(animationName);
     int boundX = getPrimaryRes().width - 128;
-    
+    static int isJumping = 0;
+
+    // Jump-related variables
+    static float velocityY = 0.0f;  // Vertical velocity
+    static const float gravity = 2000.f;  // Gravity force (acceleration)
+    static const float desiredJumpHeight = 600.0f;  // Desired jump height in pixels
+    static float jumpImpulse = 0.0f;  // Initial jump speed (calculated from desired height)
+
+    // Calculate jumpImpulse based on the desired jump height
+    if (!isJumping) {
+        jumpImpulse = -sqrt(2 * gravity * desiredJumpHeight);  // Initial jump velocity based on height
+    }
+
     float speed = 0.0f;
     if (strcmp(animationName, "RUN") == 0) {
         speed = runSpeed;
@@ -89,24 +101,32 @@ void updateMovement(char* animationName, SDL_FlipMode* flipMode, State* state, S
 
     dstRect->x += speed * direction;
 
-    //calc force
-    force = gForce((getPrimaryRes().width - dstRect->x), (getPrimaryRes().height - dstRect->y));
-    //convert to accel
-    float ax = force / GROUND;
-    float ay = force / GROUND;
-    //apply accel
-    dstRect->y += ay * dt;
-    //clamp from sinking
+    // Handle jumping
+    if (*jump == 1 && !isJumping) {  // If jump button is pressed and not already jumping
+        velocityY = jumpImpulse;  // Apply initial jump velocity
+        isJumping = 1;  // Set jumping state
+    }
+
+    // Apply gravity when jumping or falling
+    if (isJumping) {
+        dstRect->y += velocityY * dt;  // Update vertical position based on velocity
+        velocityY += gravity * dt;  // Increase downward velocity due to gravity
+    }
+
+    printf("y: %f\n", dstRect->y);
+
+    // Clamp the Y position to the ground level
     float groundY = getPrimaryRes().height - 128;
     if (dstRect->y > groundY) {
-        dstRect->y = groundY;
+        dstRect->y = groundY;  // Prevent going below ground
+        velocityY = 0.0f;  // Reset vertical velocity
+        isJumping = 0;  // Reset jumping state
     }
 
-    if (*jump == 1) {
-        dstRect->y += -100.f * dt;
-    }
+    // Reset the jump input
     *jump = 0;
 
+    // Horizontal movement and flipping
     if (dstRect->x <= 0) {
         *flipMode = SDL_FLIP_NONE;
         direction = 1;
@@ -144,7 +164,7 @@ int main() {
 
     SDL_Texture* sprite = IMG_LoadTexture(renderer, "src/cat.png");
     SDL_SetTextureScaleMode(sprite, SDL_SCALEMODE_NEAREST);
-    SDL_FRect dstRect = {0, getPrimaryRes().height - 300, 128, 128};
+    SDL_FRect dstRect = {0, getPrimaryRes().height - 128, 128, 128};
 
     char* animationStates[] = {"IDLE_1", "IDLE_2", "IDLE_3", "IDLE_4", "WALK", "RUN", "HIT", "SCARED", "FRIGHT"};
     char animationName[10];
