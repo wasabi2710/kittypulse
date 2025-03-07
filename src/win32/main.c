@@ -1,8 +1,13 @@
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_events.h>
+#include <SDL3/SDL_mouse.h>
+#include <SDL3/SDL_oldnames.h>
+#include <SDL3/SDL_rect.h>
 #include <SDL3/SDL_render.h>
 #include <SDL3/SDL_surface.h>
 #include <SDL3/SDL_timer.h>
 #include <SDL3_image/SDL_image.h>
+#include <math.h>
 #include <stdint.h>
 #include <string.h>
 #include <windows.h>
@@ -10,6 +15,9 @@
 #include <stdlib.h>
 
 #define PROJECT_NAME "KittyPulse"
+#define GRAV 10.f
+#define CATM 100.f
+#define GROUND 10000.f
 
 SDL_Window* window;
 SDL_Renderer* renderer;
@@ -58,9 +66,16 @@ State stateMachine(char* state) {
     return animationState[0];
 }
 
-void updateMovement(char* animationName, SDL_FlipMode* flipMode, State* state, SDL_FRect* dstRect) {
+/* apply normal newtonian force equation */
+float gForce(float dx, float dy) {
+    return (GRAV * CATM * GROUND) / (sqrt(dx * dx + dy * dy) / sqrt(dx * dx + dy * dy));
+}
+
+void updateMovement(char* animationName, SDL_FlipMode* flipMode, State* state, SDL_FRect* dstRect, int* jump) {
     static float walkSpeed = 5.0f;
     static float runSpeed = 10.0f;
+    float dt = 1.f / 60.f;
+    static float force;
     static int direction = 1;
     *state = stateMachine(animationName);
     int boundX = getPrimaryRes().width - 128;
@@ -73,6 +88,25 @@ void updateMovement(char* animationName, SDL_FlipMode* flipMode, State* state, S
     }
 
     dstRect->x += speed * direction;
+
+    //calc force
+    force = gForce((getPrimaryRes().width - dstRect->x), (getPrimaryRes().height - dstRect->y));
+    //convert to accel
+    float ax = force / GROUND;
+    float ay = force / GROUND;
+    //apply accel
+    dstRect->y += ay * dt;
+    //clamp from sinking
+    float groundY = getPrimaryRes().height - 128;
+    if (dstRect->y > groundY) {
+        dstRect->y = groundY;
+    }
+
+    if (*jump == 1) {
+        dstRect->y += -100.f * dt;
+    }
+    *jump = 0;
+
     if (dstRect->x <= 0) {
         *flipMode = SDL_FLIP_NONE;
         direction = 1;
@@ -110,7 +144,7 @@ int main() {
 
     SDL_Texture* sprite = IMG_LoadTexture(renderer, "src/cat.png");
     SDL_SetTextureScaleMode(sprite, SDL_SCALEMODE_NEAREST);
-    SDL_FRect dstRect = {0, getPrimaryRes().height - 128, 128, 128};
+    SDL_FRect dstRect = {0, getPrimaryRes().height - 300, 128, 128};
 
     char* animationStates[] = {"IDLE_1", "IDLE_2", "IDLE_3", "IDLE_4", "WALK", "RUN", "HIT", "SCARED", "FRIGHT"};
     char animationName[10];
@@ -126,6 +160,7 @@ int main() {
     
     SDL_Event e;
     SDL_FlipMode flipMode = SDL_FLIP_NONE;
+    int jump = 0;
 
     while (1) {
         if (SDL_PollEvent(&e) != 0) {
@@ -134,6 +169,13 @@ int main() {
                 cleanup();
                 return EXIT_SUCCESS;
             }
+
+            if (e.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+                if (e.button.button == SDL_BUTTON_LEFT) {
+                    jump = 1;
+                }
+            }
+
         }
         
         if ((SDL_GetTicks() - lastAnimChange) >= 10000) {
@@ -141,7 +183,7 @@ int main() {
             strcpy(animationName, animationStates[rand() % (sizeof(animationStates) / sizeof(animationStates[0]))]);
         }
 
-        updateMovement(animationName, &flipMode, &state, &dstRect);
+        updateMovement(animationName, &flipMode, &state, &dstRect, &jump);
 
         srcRect.x = (currentFrame % state.totalAnims) * frameWidth;
         srcRect.y = state.targetRow * frameHeight;
