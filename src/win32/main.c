@@ -32,7 +32,6 @@ ScreenSize getPrimaryRes() {
     return size;
 }
 
-
 typedef struct {
     char* name;
     int start;
@@ -64,7 +63,7 @@ State stateMachine(char* state) {
     return animationState[0];
 }
 
-void updateMovement(char* animationName, SDL_FlipMode* flipMode, State* state, SDL_FRect* dstRect, int* jump) {
+void updateMovement(char* animationName, SDL_FlipMode* flipMode, State* state, SDL_FRect* dstRect, int* jump, int* onTop) {
     static float walkSpeed = 5.0f;
     static float runSpeed = 10.0f;
     float dt = 1.f / 60.f;
@@ -76,7 +75,7 @@ void updateMovement(char* animationName, SDL_FlipMode* flipMode, State* state, S
     static const float gravity = 2000.f;
     static float desiredJumpHeight = 200.0f;
     static float jumpImpulse = 0.0f;
-    static int activeWindowTopAtJumpStart = 0; // Store the top of the active window when jumping.
+    static float lastJumpHeight = -1;  // Store last jump height
 
     if (!isJumping) {
         jumpImpulse = -sqrt(2 * gravity * desiredJumpHeight);
@@ -107,13 +106,19 @@ void updateMovement(char* animationName, SDL_FlipMode* flipMode, State* state, S
         }
     }
 
-    // Check if cat's y position is lower (greater in value) than the window top
-    if (actWindTop > 128) {
-        desiredJumpHeight = getPrimaryRes().height - actWindTop;
-        *jump = 1;
+    // Check if cat should jump
+    if ((int)dstRect->x > actWindLeft && (int)dstRect->x < actWindRight) {
+        if (actWindTop > 128) {
+            desiredJumpHeight = getPrimaryRes().height - actWindTop;
+            *jump = 1;
+            lastJumpHeight = actWindTop;
+        } 
+    } else if (dstRect->y < desiredJumpHeight) {
+        printf("please out\n");
+        isJumping = 1;
     }
 
-    if (actWindTop < 128) {
+    if (actWindTop < 128 && dstRect->y < desiredJumpHeight) {
         isJumping = 1;
     }
 
@@ -123,6 +128,7 @@ void updateMovement(char* animationName, SDL_FlipMode* flipMode, State* state, S
         strcpy(animationName, "JUMP");
     }
 
+    // Handle jumping and falling
     if (isJumping) {
         dstRect->y += velocityY * dt;
         velocityY += gravity * dt;
@@ -131,24 +137,31 @@ void updateMovement(char* animationName, SDL_FlipMode* flipMode, State* state, S
             strcpy(animationName, "FALL");
         }
 
-        // Check for landing on active window
-        if (actWindTop > 128 && dstRect->y < (actWindTop - 128)) {
+        // Ensure cat lands on the window if it is still there
+        if (dstRect->y < (actWindTop - 128)) {
             dstRect->y = actWindTop - 128;
             isJumping = 0;
             velocityY = 0;
-            strcpy(animationName, "IDLE_1");
-        } 
-    
+            strcpy(animationName, "SLEEP");
+            *onTop = 1;
+        }
+
+        // If window moves and cat is left floating, force fall
+        if (lastJumpHeight != -1 && actWindTop > lastJumpHeight && dstRect->y < (actWindTop - 128)) {
+            isJumping = 1;  // Continue falling
+        }
+
+        // Land on the ground
         if (dstRect->y >= getPrimaryRes().height - 128) {
-            dstRect->y = getPrimaryRes().height - 128;  // Land on the bottom of the screen
+            dstRect->y = getPrimaryRes().height - 128;
             isJumping = 0;
             velocityY = 0;
             strcpy(animationName, "IDLE_1");
+            *onTop = 0;
         }
 
+        *jump = 0;
     }
-
-    *jump = 0;
 
     if (dstRect->x <= 0) {
         *flipMode = SDL_FLIP_NONE;
@@ -201,6 +214,7 @@ int main() {
     SDL_Event e;
     SDL_FlipMode flipMode = SDL_FLIP_NONE;
     int jump = 0;
+    int onTop = 0;
 
     while (1) {
         if (SDL_PollEvent(&e) != 0) {
@@ -222,12 +236,12 @@ int main() {
         
         if ((SDL_GetTicks() - lastAnimChange) >= 3000) {
             lastAnimChange = SDL_GetTicks();
-            if (strcmp(animationName, "JUMP") != 0 && strcmp(animationName, "FALL") != 0) {
+            if (strcmp(animationName, "JUMP") != 0 && strcmp(animationName, "FALL") != 0 && onTop != 1) {
                 strcpy(animationName, animationStates[rand() % (sizeof(animationStates) / sizeof(animationStates[0]))]);
             }
         }
 
-        updateMovement(animationName, &flipMode, &state, &dstRect, &jump);
+        updateMovement(animationName, &flipMode, &state, &dstRect, &jump, &onTop);
 
         srcRect.x = currentFrame * frameWidth;
         srcRect.y = state.targetRow * frameHeight;
