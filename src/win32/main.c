@@ -19,13 +19,15 @@ typedef struct {
 } ScreenSize;
 
 ScreenSize getPrimaryRes() {
-    ScreenSize size = {0, 0};
+    ScreenSize size = {0, 0}; // Initialize all fields
     size.width = GetSystemMetrics(SM_CXSCREEN);
 
     RECT workArea;
     if (SystemParametersInfo(SPI_GETWORKAREA, 0, &workArea, 0)) {
         size.height = workArea.bottom - workArea.top;
-    } 
+    } else {
+        size.height = GetSystemMetrics(SM_CYSCREEN); // Fallback if SPI_GETWORKAREA fails
+    }
 
     return size;
 }
@@ -73,7 +75,7 @@ void updateMovement(char* animationName, SDL_FlipMode* flipMode, State* state, S
     static const float gravity = 2000.f;
     static float desiredJumpHeight = 200.0f;
     static float jumpImpulse = 0.0f;
-    static float lastJumpHeight = -1;
+    static float lastJumpHeight = -1;  // Store last jump height
 
     if (!isJumping) {
         jumpImpulse = -sqrt(2 * gravity * desiredJumpHeight);
@@ -88,6 +90,7 @@ void updateMovement(char* animationName, SDL_FlipMode* flipMode, State* state, S
 
     dstRect->x += speed * direction;
 
+    // Get active window's top position
     HWND actWind = GetForegroundWindow();
     int actWindTop = 0;
     int actWindBot = 0;
@@ -103,74 +106,64 @@ void updateMovement(char* animationName, SDL_FlipMode* flipMode, State* state, S
         }
     }
 
-    // Check if cat is over an active window and should jump to it
-    if ((int)dstRect->x > actWindLeft && (int)dstRect->x < actWindRight) {
-        if (actWindTop > 128 && !isJumping && *jump == 0 && *onTop == 0) {
+    printf("cat x: %f, actwinleft: %d, actwinright: %d\n", dstRect->x, actWindLeft, actWindRight - 128);
+
+    // Check if cat should jump
+    if ((int)dstRect->x >= (actWindLeft) && (int)dstRect->x <= (actWindRight - 128)) {
+        if (actWindTop > 128) {
             desiredJumpHeight = getPrimaryRes().height - actWindTop;
             *jump = 1;
-            *onTop = 1;
+            lastJumpHeight = actWindTop;
         } 
-    }
-
-    // Original code for low window automatic jumping
-    if (actWindTop < 128 && dstRect->y < desiredJumpHeight && !isJumping && *onTop == 0) {
+    } else if (dstRect->y < desiredJumpHeight) {
         isJumping = 1;
     }
 
-    // Start jump only if jump flag is set and we're not already jumping
+    if (actWindTop < 128 && dstRect->y < desiredJumpHeight) {
+        isJumping = 1;
+    }
+
     if (*jump == 1 && !isJumping) {
         velocityY = jumpImpulse;
         isJumping = 1;
-        *jump = 0;  // Clear jump flag immediately
         strcpy(animationName, "JUMP");
     }
 
-    // Handle jumping and falling physics
+    // Handle jumping and falling
     if (isJumping) {
         dstRect->y += velocityY * dt;
         velocityY += gravity * dt;
 
         if (velocityY > 0) {
             strcpy(animationName, "FALL");
-            printf("falling\n");
-        } else {
-            printf("jumping\n");
         }
 
-        // Check for landing on windows - only when falling
-        // i want to check for both velocity < 0 and velocity > 0, but its conflicting
-        if (dstRect->y < (actWindTop - 128) && velocityY < 0) {
+        // Ensure cat lands on the window if it is still there
+        if (dstRect->y < (actWindTop - 128)) {
             dstRect->y = actWindTop - 128;
             isJumping = 0;
             velocityY = 0;
-            
-            if (strcmp(animationName, "FALL") == 0 || strcmp(animationName, "JUMP") == 0) {
-                strcpy(animationName, "SLEEP");
-            }
-            *onTop = 1;  // Mark that we're on top of a window
-        }        
+            strcpy(animationName, "SLEEP");
+            *onTop = 1;
+        }
+
+        // If window moves and cat is left floating, force fall
+        if (lastJumpHeight != -1 && actWindTop > lastJumpHeight && dstRect->y < (actWindTop - 128)) {
+            isJumping = 1;  // Continue falling
+        }
 
         // Land on the ground
         if (dstRect->y >= getPrimaryRes().height - 128) {
             dstRect->y = getPrimaryRes().height - 128;
             isJumping = 0;
             velocityY = 0;
-            if (strcmp(animationName, "FALL") == 0 || strcmp(animationName, "JUMP") == 0) {
-                strcpy(animationName, "IDLE_1");
-            }
-            *onTop = 0;  // Clear onTop flag when on ground
+            strcpy(animationName, "IDLE_1");
+            *onTop = 0;
         }
+
+        *jump = 0;
     }
 
-    // Additional check: if cat slides off the window, it should fall
-    if (*onTop == 1 && ((int)dstRect->x <= actWindLeft || (int)dstRect->x >= actWindRight)) {
-        velocityY = 0; // Start with zero velocity
-        isJumping = 1; // Set jumping to true to initiate fall
-        *onTop = 0;    // No longer on top
-        strcpy(animationName, "FALL");
-    }
-
-    // Handle horizontal direction changes
     if (dstRect->x <= 0) {
         *flipMode = SDL_FLIP_NONE;
         direction = 1;
@@ -206,9 +199,9 @@ int main() {
 
     SDL_Texture* sprite = IMG_LoadTexture(renderer, "src/cat.png");
     SDL_SetTextureScaleMode(sprite, SDL_SCALEMODE_NEAREST);
-    SDL_FRect dstRect = {0, getPrimaryRes().height - 128, 128, 128};
+    SDL_FRect dstRect = {400, getPrimaryRes().height - 128, 128, 128};
 
-    char* animationStates[] = {"IDLE_1", "IDLE_2", "IDLE_3", "IDLE_4", "WALK", "SLEEP", "RUN", "HIT", "SCARED", "FRIGHT"};
+    char* animationStates[] = {"IDLE_1", "IDLE_2", "IDLE_3", "IDLE_4", "WALK", "RUN", "HIT", "SCARED", "FRIGHT"};
     char animationName[10];
     State state;
 
@@ -231,10 +224,13 @@ int main() {
                 cleanup();
                 return EXIT_SUCCESS;
             }
-        }
 
-        //printf("dimensions: left %d and rigth %d\n", getPrimaryRes().left, getPrimaryRes().right);
-        // printf("dst->y %f\n", dstRect.y);
+            if (e.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+                if (e.button.button == SDL_BUTTON_LEFT) {
+                    jump = 1;
+                }
+            }
+        }
         
         if ((SDL_GetTicks() - lastAnimChange) >= 3000) {
             lastAnimChange = SDL_GetTicks();
