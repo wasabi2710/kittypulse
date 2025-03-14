@@ -3,14 +3,12 @@
 #include <math.h>
 #include <stdint.h>
 #include <string.h>
+#include <windef.h>
 #include <windows.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #define PROJECT_NAME "KittyPulse"
-#define GRAV 10.f
-#define CATM 100.f
-#define GROUND 10000.f
 
 SDL_Window* window;
 SDL_Renderer* renderer;
@@ -21,12 +19,16 @@ typedef struct {
 } ScreenSize;
 
 ScreenSize getPrimaryRes() {
-    ScreenSize size;
+    ScreenSize size = {0, 0}; // Initialize all fields
     size.width = GetSystemMetrics(SM_CXSCREEN);
+
     RECT workArea;
     if (SystemParametersInfo(SPI_GETWORKAREA, 0, &workArea, 0)) {
         size.height = workArea.bottom - workArea.top;
+    } else {
+        size.height = GetSystemMetrics(SM_CYSCREEN); // Fallback if SPI_GETWORKAREA fails
     }
+
     return size;
 }
 
@@ -61,7 +63,7 @@ State stateMachine(char* state) {
     return animationState[0];
 }
 
-void updateMovement(char* animationName, SDL_FlipMode* flipMode, State* state, SDL_FRect* dstRect, int* jump) {
+void updateMovement(char* animationName, SDL_FlipMode* flipMode, State* state, SDL_FRect* dstRect, int* jump, int* onTop) {
     static float walkSpeed = 5.0f;
     static float runSpeed = 10.0f;
     float dt = 1.f / 60.f;
@@ -71,8 +73,9 @@ void updateMovement(char* animationName, SDL_FlipMode* flipMode, State* state, S
     static int isJumping = 0;
     static float velocityY = 0.0f;
     static const float gravity = 2000.f;
-    static const float desiredJumpHeight = 200.0f;
+    static float desiredJumpHeight = 200.0f;
     static float jumpImpulse = 0.0f;
+    static float lastJumpHeight = -1;  // Store last jump height
 
     if (!isJumping) {
         jumpImpulse = -sqrt(2 * gravity * desiredJumpHeight);
@@ -87,12 +90,46 @@ void updateMovement(char* animationName, SDL_FlipMode* flipMode, State* state, S
 
     dstRect->x += speed * direction;
 
+    // Get active window's top position
+    HWND actWind = GetForegroundWindow();
+    int actWindTop = 0;
+    int actWindBot = 0;
+    int actWindLeft = 0;
+    int actWindRight = 0;
+    if (actWind) {
+        RECT actWindRect;
+        if (GetWindowRect(actWind, &actWindRect)) {
+            actWindTop = actWindRect.top;
+            actWindBot = actWindRect.bottom;
+            actWindLeft = actWindRect.left;
+            actWindRight = actWindRect.right;
+        }
+    }
+
+    printf("cat x: %f, actwinleft: %d, actwinright: %d\n", dstRect->x, actWindLeft, actWindRight - 128);
+
+    // Check if cat should jump
+    if ((int)dstRect->x >= (actWindLeft) && (int)dstRect->x <= (actWindRight - 128)) {
+        if (actWindTop > 128) {
+            desiredJumpHeight = getPrimaryRes().height - actWindTop;
+            *jump = 1;
+            lastJumpHeight = actWindTop;
+        } 
+    } else if (dstRect->y < desiredJumpHeight) {
+        isJumping = 1;
+    }
+
+    if (actWindTop < 128 && dstRect->y < desiredJumpHeight) {
+        isJumping = 1;
+    }
+
     if (*jump == 1 && !isJumping) {
         velocityY = jumpImpulse;
         isJumping = 1;
         strcpy(animationName, "JUMP");
     }
 
+    // Handle jumping and falling
     if (isJumping) {
         dstRect->y += velocityY * dt;
         velocityY += gravity * dt;
@@ -101,15 +138,31 @@ void updateMovement(char* animationName, SDL_FlipMode* flipMode, State* state, S
             strcpy(animationName, "FALL");
         }
 
+        // Ensure cat lands on the window if it is still there
+        if (dstRect->y < (actWindTop - 128)) {
+            dstRect->y = actWindTop - 128;
+            isJumping = 0;
+            velocityY = 0;
+            strcpy(animationName, "SLEEP");
+            *onTop = 1;
+        }
+
+        // If window moves and cat is left floating, force fall
+        if (lastJumpHeight != -1 && actWindTop > lastJumpHeight && dstRect->y < (actWindTop - 128)) {
+            isJumping = 1;  // Continue falling
+        }
+
+        // Land on the ground
         if (dstRect->y >= getPrimaryRes().height - 128) {
             dstRect->y = getPrimaryRes().height - 128;
             isJumping = 0;
             velocityY = 0;
             strcpy(animationName, "IDLE_1");
+            *onTop = 0;
         }
-    }
 
-    *jump = 0;
+        *jump = 0;
+    }
 
     if (dstRect->x <= 0) {
         *flipMode = SDL_FLIP_NONE;
@@ -146,7 +199,7 @@ int main() {
 
     SDL_Texture* sprite = IMG_LoadTexture(renderer, "src/cat.png");
     SDL_SetTextureScaleMode(sprite, SDL_SCALEMODE_NEAREST);
-    SDL_FRect dstRect = {0, getPrimaryRes().height - 128, 128, 128};
+    SDL_FRect dstRect = {400, getPrimaryRes().height - 128, 128, 128};
 
     char* animationStates[] = {"IDLE_1", "IDLE_2", "IDLE_3", "IDLE_4", "WALK", "RUN", "HIT", "SCARED", "FRIGHT"};
     char animationName[10];
@@ -162,6 +215,7 @@ int main() {
     SDL_Event e;
     SDL_FlipMode flipMode = SDL_FLIP_NONE;
     int jump = 0;
+    int onTop = 0;
 
     while (1) {
         if (SDL_PollEvent(&e) != 0) {
@@ -180,12 +234,12 @@ int main() {
         
         if ((SDL_GetTicks() - lastAnimChange) >= 3000) {
             lastAnimChange = SDL_GetTicks();
-            if (strcmp(animationName, "JUMP") != 0 && strcmp(animationName, "FALL") != 0) {
+            if (strcmp(animationName, "JUMP") != 0 && strcmp(animationName, "FALL") != 0 && onTop != 1) {
                 strcpy(animationName, animationStates[rand() % (sizeof(animationStates) / sizeof(animationStates[0]))]);
             }
         }
 
-        updateMovement(animationName, &flipMode, &state, &dstRect, &jump);
+        updateMovement(animationName, &flipMode, &state, &dstRect, &jump, &onTop);
 
         srcRect.x = currentFrame * frameWidth;
         srcRect.y = state.targetRow * frameHeight;
