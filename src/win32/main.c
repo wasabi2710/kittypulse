@@ -1,12 +1,8 @@
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h>
 #include <math.h>
-#include <stdint.h>
-#include <string.h>
-#include <windef.h>
 #include <windows.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 #define PROJECT_NAME "KittyPulse"
 
@@ -279,6 +275,7 @@ int main() {
     int onTop = 0;
 
     while (1) {
+
         // if (SDL_PollEvent(&e) != 0) {
         //     if (e.type == SDL_EVENT_QUIT) {
         //         SDL_DestroyTexture(sprite);
@@ -286,6 +283,7 @@ int main() {
         //         return EXIT_SUCCESS;
         //     }
         // }
+        
         if ((SDL_GetTicks() - lastAnimChange) >= 3000) {
             lastAnimChange = SDL_GetTicks();
             if (strcmp(animationName, "JUMP") != 0 && strcmp(animationName, "FALL") != 0 && onTop != 1) {
