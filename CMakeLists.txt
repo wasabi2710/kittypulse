@@ -12,11 +12,12 @@ if (WIN32)
     set_target_properties(SDL3_image::SDL3_image-shared PROPERTIES 
         IMPORTED_IMPLIB "C:\\Program Files (x86)\\SDL3_image\\lib\\libSDL3_image.dll.a"
     )
-    target_link_libraries(${PROJECT_NAME} PRIVATE SDL3_image::SDL3_image SDL3::SDL3)
+    target_link_libraries(${PROJECT_NAME} PRIVATE SDL3_image::SDL3_image SDL3::SDL3 gdiplus)
 
     # Copy resources
     file(COPY ${CMAKE_SOURCE_DIR}/src/win32/cat.ico DESTINATION ${CMAKE_BINARY_DIR})
     file(COPY ${CMAKE_SOURCE_DIR}/src/cat.png DESTINATION ${CMAKE_BINARY_DIR}/src)
+    #file(COPY ${CMAKE_SOURCE_DIR}/src/bg.jpg DESTINATION ${CMAKE_BINARY_DIR})
 
     # Copy DLLs
     file(GLOB DLLS "${CMAKE_SOURCE_DIR}/dlls/*.dll")
