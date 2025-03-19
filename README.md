@@ -1,4 +1,4 @@
-### Kittypulse
+### KITTYPULSE
 Your personal, mischevious cat that loves to sleep on top your minimized active windows.
 
 ### REQUIREMENTS
