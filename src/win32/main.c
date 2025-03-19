@@ -15,6 +15,7 @@
 SDL_Window* window;
 SDL_Renderer* renderer;
 NOTIFYICONDATA nid = {0};
+static int rendering = 1;
 
 typedef struct {
     int width;
@@ -69,7 +70,7 @@ State stateMachine(char* state) {
 void updateMovement(char* animationName, SDL_FlipMode* flipMode, State* state, SDL_FRect* dstRect, int* jump, int* onTop) {
     static float walkSpeed = 5.0f;
     static float runSpeed = 10.0f;
-    float dt = 1.f / 60.f;
+    float dt = 1.f / 60.f;  
     static int direction = 1;
     *state = stateMachine(animationName);
     int boundX = getPrimaryRes().width - 128;
@@ -304,9 +305,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
                 if (cmd == 1) {  // Hide window
                     ShowWindow(hwnd, SW_HIDE);
+                    rendering = 0;
                 }
                 if (cmd == 2) {  // Show window
                     ShowWindow(hwnd, SW_SHOW);
+                    rendering = 1;
                 }
                 if (cmd == 3) { 
                     cleanup();
@@ -327,6 +330,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 }
 
 int main() {
+    FreeConsole();
+
     ULONG_PTR gdiplusToken;
 
     // Initialize GDI+
@@ -418,8 +423,13 @@ int main() {
                 return EXIT_SUCCESS;
             }
         }
+
+        if (!rendering) {  // Skip rendering if the window is hidden
+            SDL_Delay(32);  // Optional: you can delay a bit to prevent unnecessary CPU usage
+            continue;
+        }
         
-        if ((SDL_GetTicks() - lastAnimChange) >= 10000) { //10s randomizer
+        if ((SDL_GetTicks() - lastAnimChange) >= 60000) { //10s randomizer
             lastAnimChange = SDL_GetTicks();
             if (strcmp(animationName, "JUMP") != 0 && strcmp(animationName, "FALL") != 0 && onTop != 1) {
                 strcpy(animationName, animationStates[rand() % (sizeof(animationStates) / sizeof(animationStates[0]))]);
