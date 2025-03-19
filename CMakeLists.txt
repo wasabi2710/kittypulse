@@ -17,7 +17,6 @@ if (WIN32)
     # Copy resources
     file(COPY ${CMAKE_SOURCE_DIR}/src/win32/cat.ico DESTINATION ${CMAKE_BINARY_DIR})
     file(COPY ${CMAKE_SOURCE_DIR}/src/cat.png DESTINATION ${CMAKE_BINARY_DIR}/src)
-    #file(COPY ${CMAKE_SOURCE_DIR}/src/bg.jpg DESTINATION ${CMAKE_BINARY_DIR})
 
     # Copy DLLs
     file(GLOB DLLS "${CMAKE_SOURCE_DIR}/dlls/*.dll")
